@@ -17,13 +17,21 @@ const load=async()=>{R=await tx('records','readonly',o=>o.getAll())};
 const put=r=>tx('records','readwrite',o=>o.put(r)),del=id=>tx('records','readwrite',o=>o.delete(id));
 const setMeta=()=>tx('meta','readwrite',o=>o.put({k:'m',v:M}));
 const toast=t=>{const e=$('#toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),2200)};
+const greet=()=>{const h=new Date().getHours();
+ if(h<5)return '夜深了，适合和自己待一会儿';
+ if(h<9)return '早上好，今天想留下点什么';
+ if(h<12)return '上午好，看看自己正在怎样生活';
+ if(h<14)return '中午了，歇一歇吧';
+ if(h<18)return '午后安，继续走自己的路';
+ if(h<22)return '晚上好，适合回望的一天';
+ return '夜深了，写两句再睡吧'};
 const byDate=(a,b)=>b.date.localeCompare(a.date)||(b.updated||0)-(a.updated||0);
 /* ---------- 视图 ---------- */
 const card=r=>`<article class="card" data-id="${r.id}" style="--c:${D[r.dir].c}"><div class="meta">${esc(r.date)}　${esc(D[r.dir].n)}${r.module?'　'+esc(r.module):''}${r.fav?'　★':''}</div><h3>${esc(r.title||'（无题）')}</h3><p>${esc((r.content||'').slice(0,120))}</p>${r.images&&r.images[0]?`<img src="${r.images[0]}" alt="">`:''}<div class="tags">${(r.tags||[]).map(t=>'<i>#'+esc(t)+'</i>').join('')}</div></article>`;
 const list=a=>a.length?a.map(card).join(''):'<p class="empty">这里还很安静。想写的时候再写。</p>';
 const dirA=k=>`<a class="dir ${k}" style="--c:${D[k].c}" href="#/d/${k}"><b>${{up:'↑',in:'←',out:'→',down:'↓'}[k]} ${D[k].n}</b><span>${D[k].t}</span><small>${D[k].s}</small></a>`;
 const home=()=>{const rec=R.slice().sort((a,b)=>(b.updated||0)-(a.updated||0)).slice(0,3);
- return `<header><h1>人生经纬</h1><small>${new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'})}</small></header>
+ return `<header><h1>人生坐标</h1><small>${new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'})}</small><p class="greet">${greet()}</p></header>
  <div class="map">${dirA('up')}${dirA('in')}<a class="me" href="#/data">${esc(M.name||'我')}</a>${dirA('out')}${dirA('down')}</div>
  <p class="quote">不是告诉我应该怎样生活，<br>而是帮助我看见，我正在怎样生活。</p>${rec.length?'<h5>最近写下的</h5>'+rec.map(card).join(''):''}`};
 const timeline=a=>{if(!a.length)return list(a);const g={};
@@ -90,8 +98,8 @@ const act={
  new(){const m=location.hash.match(/#\/d\/(\w+)/),k=m&&D[m[1]]?m[1]:null;edit(k?{dir:k,module:S.mod}:{})},
  next(){S.pick++;render()},
  reflect(){const r=R.find(x=>x.id===S.cur);if(r)edit({dir:r.dir,module:r.module,title:'回望：'+r.title,tags:r.tags})},
- exp(){const b=new Blob([JSON.stringify({app:'life-map',version:1,exportedAt:new Date().toISOString(),meta:M,records:R},null,1)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`人生经纬-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('已导出')},
+ exp(){const b=new Blob([JSON.stringify({app:'life-coords',version:1,exportedAt:new Date().toISOString(),meta:M,records:R},null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`人生坐标-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('已导出')},
  imp(){$('#file').click()},
  async wipe(){if(confirm('将清空本机所有记录，且无法恢复。已经导出备份了吗？确定清空？')){await tx('records','readwrite',o=>o.clear());await load();render();toast('已清空')}}};
 async function imp(f){try{const j=JSON.parse(await f.text());if(!Array.isArray(j.records))throw 0;

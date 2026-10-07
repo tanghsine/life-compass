@@ -8,6 +8,7 @@ h3{font-size:16px;font-weight:600}h5{font-size:13px;color:var(--mute);font-weigh
 small,.meta,.note{color:var(--mute);font-size:13px}.note{margin:8px 0 14px;line-height:1.7}
 a{color:inherit;text-decoration:none}.back{font-size:14px;color:var(--mute)}
 header{display:flex;flex-direction:column;gap:2px}
+.greet{color:var(--mute);font-size:13.5px;margin-top:4px;letter-spacing:.05em}
 .map{display:grid;grid-template-columns:1fr 84px 1fr;gap:10px;margin:26px 0 22px}
 .dir{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-top:2px solid var(--c);background:var(--card);padding:14px 12px;border-radius:3px}
 .dir b{font-weight:500;color:var(--c);letter-spacing:.15em}.dir span{font-size:15px}.dir small{font-size:12px;line-height:1.5}
