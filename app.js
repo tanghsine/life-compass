@@ -54,8 +54,12 @@ const lookView=()=>{const t=new Date(),now=Date.now(),dt=r=>new Date(r.date+'T00
  return `<h2>回望</h2><p class="note">${ago}${same.length?'的今天':''}，你写下：</p><article class="card" data-id="${r.id}" style="--c:${D[r.dir].c}"><div class="meta">${esc(r.date)}　${esc(D[r.dir].n)}${r.module?'　'+esc(r.module):''}</div><h3>${esc(r.title)}</h3><p>${esc(r.content)}</p>${(r.images||[]).map(s=>`<img src="${s}" alt="">`).join('')}</article>
  <div class="row" style="margin-top:16px"><button data-act="reflect" class="pri">写下现在的看法</button>${pool.length>1?'<button data-act="next">换一条</button>':''}</div>`};
 const dataView=()=>`<h2>数据与设置</h2><label>名字<input id="nm" value="${esc(M.name)}" placeholder="显示在人生版图中央"></label><label>出生年份（可选，时间轴会显示年龄）<input id="bi" type="number" inputmode="numeric" value="${esc(M.birth)}" placeholder="例如 1996"></label>
- <p class="note">所有内容只保存在这台设备的这个浏览器里，没有上传到任何地方。更换设备、重新部署或清理浏览器数据前，请先导出备份。目前共 ${R.length} 条记录。</p>
- <div class="row"><button data-act="exp">导出 JSON</button><button data-act="imp">导入 JSON</button><input id="file" type="file" accept=".json,application/json" hidden></div>
+ <p class="note">所有内容只保存在这台设备的这个浏览器里，没有上传到任何地方。更换设备、重新部署或清理浏览器数据前，请先备份。目前共 ${R.length} 条记录。</p>
+ <h2 style="font-size:15px;margin-top:18px">备份</h2>
+ <div class="row"><button data-act="copytxt" class="pri">复制纯文本备份</button><button data-act="exp">导出完整备份</button></div>
+ <textarea id="bk" rows="6" placeholder="在此粘贴备份文本…"></textarea>
+ <div class="row"><button data-act="imptxt">从文本导入</button><button data-act="imp">或选择备份文件</button></div><input id="file" type="file" accept=".json,application/json" hidden>
+ <p class="note">备份文本可直接粘贴到备忘录保存。建议每月备份一次，换手机或清理数据前先备份。纯文本备份不含图片；要备份图片请用「导出完整备份」下载文件保存。</p>
  <div class="row" style="margin-top:28px"><button class="danger" data-act="wipe">清空所有数据</button></div>`;
 function render(){const h=location.hash.replace(/^#\/?/,''),[a,b]=h.split('/');
  const s='#/'+(a==='d'?'':a||'');document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('on',x.getAttribute('href')===s));
@@ -94,19 +98,40 @@ function edit(p={}){
   await put(n);await load();close();render();toast('已保存')};
 }
 /* ---------- 导入导出 ---------- */
+const bkpHead=()=>({app:'life-coords',name:'人生坐标',version:2,exportedAt:new Date().toISOString()});
 const act={
  new(){const m=location.hash.match(/#\/d\/(\w+)/),k=m&&D[m[1]]?m[1]:null;edit(k?{dir:k,module:S.mod}:{})},
  next(){S.pick++;render()},
  reflect(){const r=R.find(x=>x.id===S.cur);if(r)edit({dir:r.dir,module:r.module,title:'回望：'+r.title,tags:r.tags})},
- exp(){const b=new Blob([JSON.stringify({app:'life-coords',version:1,exportedAt:new Date().toISOString(),meta:M,records:R},null,1)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`人生坐标-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('已导出')},
+ exp(){const b=new Blob([JSON.stringify({...bkpHead(),data:{meta:M,records:R}})],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`人生坐标-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('已导出完整备份（含图片）')},
+ copytxt(){const s=JSON.stringify({...bkpHead(),data:{meta:M,note:'纯文本备份不含图片',records:R.map(r=>({...r,images:[],_imageCount:(r.images||[]).length}))}});
+  const t=$('#bk');t.value=s;t.select();try{t.setSelectionRange(0,s.length)}catch(e){}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(s).then(()=>toast('已复制，去备忘录粘贴保存'),()=>toast('已填入文本框，长按全选复制'));else toast('已填入文本框，长按全选复制')},
+ imptxt(){importText(($('#bk').value||'').trim())},
  imp(){$('#file').click()},
  async wipe(){if(confirm('将清空本机所有记录，且无法恢复。已经导出备份了吗？确定清空？')){await tx('records','readwrite',o=>o.clear());await load();render();toast('已清空')}}};
-async function imp(f){try{const j=JSON.parse(await f.text());if(!Array.isArray(j.records))throw 0;
+async function imp(f){try{importText(await f.text())}catch{toast('文件读取失败')}}
+async function importText(str){
+ let j;try{j=JSON.parse(str)}catch{return toast('文本无法识别：请粘贴完整的备份文本')}
+ const recs=j.records||(j.data&&j.data.records);
+ if(!Array.isArray(recs))return toast('这不是有效的备份：缺少记录列表');
+ const ap=j.app||'';
+ if(ap&&ap!=='life-coords'&&ap!=='life-map')return toast('这不是人生坐标的备份');
+ if(!confirm(`将合并导入 ${recs.length} 条记录：文字以备份为准，本地已有图片保留。继续？`))return;
  const cur=new Map(R.map(r=>[r.id,r]));let n=0;
- for(const r of j.records){if(!r||!r.id||!D[r.dir])continue;const o=cur.get(r.id);if(!o||(r.updated||0)>(o.updated||0)){await put({title:'',content:'',date:today(),tags:[],images:[],history:[],...r});n++}}
- if(j.meta&&!M.name){M={...M,...j.meta};await setMeta()}
- await load();render();toast(`已导入 ${n} 条记录`)}catch{toast('文件无法识别，请选择由本应用导出的 JSON')}}
+ for(const r of recs){
+  if(!r||!r.id||!D[r.dir])continue;
+  const o=cur.get(r.id);
+  if(o&&(r.updated||0)<=(o.updated||0))continue;
+  const imgs=(r.images&&r.images.length)?r.images:((o&&(o.images||[]).length)?o.images:[]);
+  const c={...r};delete c._imageCount;
+  await put({title:'',content:'',date:today(),tags:[],images:[],history:[],...c,images:imgs});n++;
+ }
+ const meta=j.meta||(j.data&&j.data.meta);
+ if(meta&&!M.name){M={...M,...meta};await setMeta()}
+ await load();render();toast(`已恢复 ${n} 条记录`);
+}
 /* ---------- 事件 ---------- */
 document.addEventListener('click',e=>{const t=e.target.closest('[data-id],[data-mod],[data-tab],[data-fav],[data-dir],[data-act]');if(!t)return;const d=t.dataset;
  if(d.id)return edit({id:d.id});if('mod' in d){S.mod=d.mod;return render()}if(d.tab){S.tab=d.tab;return render()}
